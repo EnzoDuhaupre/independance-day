@@ -1,6 +1,5 @@
-"""
+""""
 Gestion du niveau infini (Easter Egg)
-PROGRESSION INFINIE JUSQU'À L'IMPOSSIBLE !
 """
 import pygame
 import random
@@ -16,7 +15,7 @@ def update_niveau_infini(jeu_instance):
     jeu_instance.vfx.update()
     jeu_instance.all_sprites.update()
     jeu_instance.items.update()
-
+    
     # Tir automatique du joueur
     balles = jeu_instance.joueur.verifier_tir_auto()
     if balles:
@@ -25,50 +24,25 @@ def update_niveau_infini(jeu_instance):
         for balle in balles:
             jeu_instance.all_sprites.add(balle)
             jeu_instance.balles.add(balle)
-
+    
     temps_ecoule = (pygame.time.get_ticks() - jeu_instance.debut_niveau) / 1000
-
-    # ===== PROGRESSION INFINIE - DIFFICULTÉ CROISSANTE =====
-    # 0-5min : Phases 1-5 - Montée en difficulté classique
-    # 5min : 1 BOSS apparaît
-    # 10min : 2 BOSS + spawn accéléré
-    # 15min : 3 BOSS + spawn très rapide
-    # 20min+ : 4+ BOSS + spawn ultra rapide = IMPOSSIBLE !
 
     now = pygame.time.get_ticks()
     nb_mobs = len(jeu_instance.mobs)
 
-    # ===== GESTION DES BOSS MULTIPLES =====
-    # Calculer combien de boss doivent être présents
-    nb_boss_requis = 0
-    if temps_ecoule >= 300:  # 5 minutes
-        nb_boss_requis = 1
-    if temps_ecoule >= 600:  # 10 minutes
-        nb_boss_requis = 2
-    if temps_ecoule >= 900:  # 15 minutes
-        nb_boss_requis = 3
-    if temps_ecoule >= 1200:  # 20 minutes
-        nb_boss_requis = 4
-    if temps_ecoule >= 1500:  # 25 minutes (si quelqu'un survit jusque-là !)
-        nb_boss_requis = 5
+    # ===== SPAWN DU BOSS À 5 MINUTES =====
+    if temps_ecoule >= 300:  # 5 minutes = 300 secondes
+        # Faire apparaître le boss une seule fois
+        if not hasattr(jeu_instance, 'boss_infini_apparu'):
+            from classes.boss import Boss
+            jeu_instance.boss = Boss()
+            jeu_instance.all_sprites.add(jeu_instance.boss)
+            jeu_instance.mobs.add(jeu_instance.boss)
+            jeu_instance.boss_infini_apparu = True
+            print("[INFO] 🔥 BOSS INFINI APPARAÎT ! Survivez !")
 
-    # Compter les boss actuellement présents
-    from classes.boss import Boss
-    boss_actuels = [m for m in jeu_instance.mobs if isinstance(m, Boss)]
-    nb_boss_actuels = len(boss_actuels)
-
-    # Spawner les boss manquants
-    if nb_boss_actuels < nb_boss_requis:
-        nb_a_spawner = nb_boss_requis - nb_boss_actuels
-        for i in range(nb_a_spawner):
-            boss = Boss()
-            jeu_instance.all_sprites.add(boss)
-            jeu_instance.mobs.add(boss)
-            print(f"[INFO] 🔥 BOSS #{nb_boss_actuels + i + 1} APPARAÎT ! Total: {nb_boss_actuels + i + 1} BOSS !")
-
-    # ===== CALCUL DE LA DIFFICULTÉ EN FONCTION DU TEMPS =====
     # Déterminer le nombre max d'ennemis et le délai selon le temps
-
+    # TOUTES LES PHASES DURENT 1 MINUTE
     if temps_ecoule < 60:
         # Phase 1 (0-1min) : Facile - Tornades simples uniquement
         max_ennemis = 2
@@ -94,32 +68,15 @@ def update_niveau_infini(jeu_instance):
         max_ennemis = 4
         delai_spawn = 1400
         types_ennemis = ["tornade", "ufo", "meteorite", "comet"]
-    elif temps_ecoule < 600:
-        # Phase 6 (5-10min) : 1 BOSS + ennemis modérés
-        max_ennemis = 3 + nb_boss_actuels  # 3 ennemis normaux + le boss
-        delai_spawn = 2000
-        types_ennemis = ["tornade", "ufo", "meteorite", "comet"]
-    elif temps_ecoule < 900:
-        # Phase 7 (10-15min) : 2 BOSS + spawn accéléré
-        max_ennemis = 5 + nb_boss_actuels  # 5 ennemis normaux + 2 boss
-        delai_spawn = 1500
-        types_ennemis = ["tornade", "ufo", "meteorite", "comet"]
-    elif temps_ecoule < 1200:
-        # Phase 8 (15-20min) : 3 BOSS + spawn très rapide
-        max_ennemis = 7 + nb_boss_actuels  # 7 ennemis normaux + 3 boss
-        delai_spawn = 1000
-        types_ennemis = ["tornade", "ufo", "meteorite", "comet"]
     else:
-        # Phase 9+ (20min+) : 4+ BOSS + spawn ultra rapide = IMPOSSIBLE !
-        max_ennemis = 10 + nb_boss_actuels  # 10 ennemis normaux + 4+ boss
-        delai_spawn = 800  # Spawn très rapide
+        # Phase 6+ (5min+) : BOSS + ennemis modérés
+        # BOSS EST LÀ : Moins d'ennemis et spawn plus lent pour rendre le combat gérable
+        max_ennemis = 3  # Boss + 2 autres seulement
+        delai_spawn = 2000  # Spawn toutes les 2 secondes
         types_ennemis = ["tornade", "ufo", "meteorite", "comet"]
 
-    # Spawner les ennemis normaux (pas les boss)
-    # Ne compter que les ennemis non-boss
-    nb_ennemis_normaux = nb_mobs - nb_boss_actuels
-
-    if nb_ennemis_normaux < max_ennemis:
+    # Spawner les ennemis normaux (pas le boss)
+    if nb_mobs < max_ennemis:
         if now - jeu_instance.dernier_spawn > delai_spawn:
             type_ennemi = random.choice(types_ennemis)
 
@@ -160,9 +117,6 @@ def update_niveau_infini(jeu_instance):
             # Son différent selon le type d'ennemi
             if isinstance(mob, Tornade):
                 jeu_instance.musique.jouer_effet("vent")
-            elif isinstance(mob, Boss):
-                jeu_instance.musique.jouer_effet("explosion")
-                print(f"[INFO] 💀 BOSS VAINCU ! Reste: {nb_boss_actuels - 1} boss")
             else:
                 jeu_instance.musique.jouer_effet("explosion")
 
@@ -179,6 +133,38 @@ def update_niveau_infini(jeu_instance):
             jeu_instance.musique.jouer_effet("extra_vie")
             jeu_instance.vfx.ajouter(vie_item.rect.centerx, vie_item.rect.centery, ROUGE, 10)
 
+    # ===== GESTION DU BOSS =====
+    if hasattr(jeu_instance, 'boss') and jeu_instance.boss:
+        # Mettre à jour les projectiles du boss
+        for projectile in jeu_instance.boss.projectiles[:]:
+            projectile.update()
+            # Supprimer si hors écran
+            if not projectile.rect.colliderect(pygame.Rect(0, 0, LARGEUR_JEU, HAUTEUR_JEU)):
+                jeu_instance.boss.projectiles.remove(projectile)
+        
+        # Collision laser du boss avec le joueur (enlève 2 vies !)
+        if jeu_instance.boss.laser_actif:
+            laser_rect = jeu_instance.boss.get_laser_rect()
+            if laser_rect and jeu_instance.joueur.rect.colliderect(laser_rect):
+                if not jeu_instance.joueur.invincible:
+                    jeu_instance.vies -= 2  # Le laser enlève 2 vies !
+                    jeu_instance.vfx.declencher_degats()
+                    jeu_instance.vfx.ajouter(jeu_instance.joueur.rect.centerx, jeu_instance.joueur.rect.centery, ROUGE_SANG, 20)
+                    jeu_instance.musique.jouer_effet("degats")
+                    # Rendre temporairement invincible
+                    jeu_instance.joueur.invincible = True
+                    jeu_instance.joueur.fin_invincibilite = pygame.time.get_ticks() + 2000
+        
+        # Collision projectiles du boss avec le joueur
+        for projectile in jeu_instance.boss.projectiles[:]:
+            if jeu_instance.joueur.rect.colliderect(projectile.rect):
+                if not jeu_instance.joueur.invincible:
+                    jeu_instance.vies -= 1
+                    jeu_instance.vfx.declencher_degats()
+                    jeu_instance.vfx.ajouter(jeu_instance.joueur.rect.centerx, jeu_instance.joueur.rect.centery, ROUGE_SANG, 10)
+                    jeu_instance.musique.jouer_effet("degats")
+                jeu_instance.boss.projectiles.remove(projectile)
+
     # Collisions joueur/ennemis
     if pygame.sprite.spritecollide(jeu_instance.joueur, jeu_instance.mobs, True):
         if not jeu_instance.joueur.invincible:
@@ -187,41 +173,8 @@ def update_niveau_infini(jeu_instance):
             jeu_instance.vfx.ajouter(jeu_instance.joueur.rect.centerx, jeu_instance.joueur.rect.centery, ROUGE_SANG, 15)
             jeu_instance.musique.jouer_effet("degats")
 
-    # Collision laser des boss avec le joueur (enlève 2 vies !)
-    for boss in boss_actuels:
-        if boss.laser_actif:
-            laser_rect = boss.get_laser_rect()
-            if laser_rect and jeu_instance.joueur.rect.colliderect(laser_rect):
-                if not jeu_instance.joueur.invincible:
-                    jeu_instance.vies -= 2  # Le laser enlève 2 vies !
-                    jeu_instance.vfx.declencher_degats()
-                    jeu_instance.vfx.ajouter(jeu_instance.joueur.rect.centerx, jeu_instance.joueur.rect.centery,
-                                             ROUGE_SANG, 20)
-                    jeu_instance.musique.jouer_effet("degats")
-                    # Rendre temporairement invincible pour éviter mort instantanée
-                    jeu_instance.joueur.invincible = True
-                    jeu_instance.joueur.fin_invincibilite = pygame.time.get_ticks() + 2000  # 2 secondes
-
-        # Collision projectiles des boss avec le joueur
-        for projectile in boss.projectiles[:]:
-            if jeu_instance.joueur.rect.colliderect(projectile.rect):
-                if not jeu_instance.joueur.invincible:
-                    jeu_instance.vies -= 1
-                    jeu_instance.vfx.declencher_degats()
-                    jeu_instance.vfx.ajouter(jeu_instance.joueur.rect.centerx, jeu_instance.joueur.rect.centery,
-                                             ROUGE_SANG, 10)
-                    jeu_instance.musique.jouer_effet("degats")
-                boss.projectiles.remove(projectile)
-
-    # Mettre à jour les projectiles des boss
-    for boss in boss_actuels:
-        for projectile in boss.projectiles[:]:
-            projectile.update()
-            # Vérifier si le projectile est mort
-            if not projectile.rect.colliderect(pygame.Rect(0, 0, LARGEUR_JEU, HAUTEUR_JEU)):
-                boss.projectiles.remove(projectile)
-
     # Ennemis hors écran (pas pour comètes/météorites/boss)
+    from classes.boss import Boss
     for m in list(jeu_instance.mobs):
         if m.rect.top > HAUTEUR_JEU and not isinstance(m, (Comet, Meteorite, Boss)):
             m.kill()
